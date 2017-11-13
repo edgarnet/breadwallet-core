@@ -1,8 +1,9 @@
 //
-//  BRMerkleBlock.h
+//  BRMerkleBlock_h
 //
 //  Created by Aaron Voisine on 8/6/15.
-//  Copyright (c) 2015 breadwallet LLC
+//  Copyright (c) 2017 panwallet LLC.
+//  Copyright (c) 2015 breadwallet LLC.
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -20,12 +21,14 @@
 //  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 //  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 //  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-//  THE SOFTWARE.
+//  THE SOFTWARE
 
 #ifndef BRMerkleBlock_h
 #define BRMerkleBlock_h
 
 #include "BRInt.h"
+#include "BRSet.h"
+#include "PNArith_256.h"
 #include <stddef.h>
 #include <inttypes.h>
 
@@ -33,7 +36,7 @@
 extern "C" {
 #endif
 
-#define BLOCK_DIFFICULTY_INTERVAL 2016 // number of blocks between difficulty target adjustments
+//#define BLOCK_DIFFICULTY_INTERVAL 2016 // number of blocks between difficulty target adjustments
 #define BLOCK_UNKNOWN_HEIGHT      INT32_MAX
 #define BLOCK_MAX_TIME_DRIFT      (2*60*60) // the furthest in the future a block is allowed to be timestamped
 
@@ -86,6 +89,9 @@ int BRMerkleBlockContainsTxHash(const BRMerkleBlock *block, UInt256 txHash);
 // transitionTime is the timestamp of the block at the previous difficulty transition
 // transitionTime may be 0 if block->height is not a multiple of BLOCK_DIFFICULTY_INTERVAL
 int BRMerkleBlockVerifyDifficulty(const BRMerkleBlock *block, const BRMerkleBlock *previous, uint32_t transitionTime);
+
+// returns the next expected target of the previous block
+uint32_t DarkGravityWave(const BRSet *blocks, BRMerkleBlock *previous);
 
 // returns a hash value for block suitable for use in a hashtable
 inline static size_t BRMerkleBlockHash(const void *block)

@@ -319,14 +319,14 @@ int BRMerkleBlockVerifyDifficulty(const BRMerkleBlock *block, const BRMerkleBloc
     assert(previous != NULL);
     
     if (! previous || !UInt256Eq(block->prevBlock, previous->blockHash) || block->height != previous->height + 1) r = 0;
-    if (r && (block->height % BLOCK_DIFFICULTY_INTERVAL) == 0 && transitionTime == 0) r = 0;
+//    if (r && (block->height % BLOCK_DIFFICULTY_INTERVAL) == 0 && transitionTime == 0) r = 0;
     
 #if BITCOIN_TESTNET
     // TODO: implement testnet difficulty rule check
     return r; // don't worry about difficulty on testnet for now
 #endif
     
-    if (r && (block->height % BLOCK_DIFFICULTY_INTERVAL) == 0) {
+   if (r /*&& (block->height % BLOCK_DIFFICULTY_INTERVAL) == 0*/) {
         // target is in "compact" format, where the most significant byte is the size of resulting value in bytes, next
         // bit is the sign, and the remaining 23bits is the value after having been right shifted by (size - 3)*8 bits
         static const uint32_t maxsize = MAX_PROOF_OF_WORK >> 24, maxtarget = MAX_PROOF_OF_WORK & 0x00ffffff;
@@ -353,6 +353,54 @@ int BRMerkleBlockVerifyDifficulty(const BRMerkleBlock *block, const BRMerkleBloc
     else if (r && block->target != previous->target) r = 0;
     
     return r;
+}
+
+uint32_t DarkGravityWave(const BRSet *blocks, BRMerkleBlock *previous) {
+        uint32_t result = 0;
+        UInt256 powLimit = UINT256_ZERO;
+        powLimit = u256_hex_decode("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        uint32_t nPastBlocks = 24;
+        if (!previous || previous->height < nPastBlocks) {
+                return UInt32GetLE(&powLimit);
+        }
+
+        BRMerkleBlock *bindex = previous;
+        UInt256 pastTargetAvg = UINT256_ZERO;
+
+        for (uint32_t nCountBlocks = 1; nCountBlocks <= nPastBlocks; nCountBlocks++) {
+                assert(bindex != NULL);
+		UInt256 bnTarget = setCompact(bindex->target);
+                if (nCountBlocks == 1) {
+                        pastTargetAvg = bnTarget;
+                }
+                else {
+                        UInt256 mult = stdMultiply( pastTargetAvg, nCountBlocks );
+                        UInt256 add = arithAdd( mult, bnTarget );
+                        UInt256 div = stdDivide( add, nCountBlocks + 1 );
+                        pastTargetAvg = div;
+                }
+                bindex = BRSetIterate( blocks, &bindex->prevBlock );
+		assert( bindex != NULL );
+        }
+
+        UInt256 bnNew = pastTargetAvg;
+
+        uint32_t nActualTimespan = previous->timestamp;
+        uint32_t nTargetTimespan = nPastBlocks * 1.5 * 60;
+
+        if (nActualTimespan < nTargetTimespan / 3)
+                nActualTimespan = nTargetTimespan / 3;
+        if (nActualTimespan > nTargetTimespan * 3)
+                nActualTimespan = nTargetTimespan * 3;
+
+        // Retarget
+        bnNew = stdMultiply( bnNew, nActualTimespan );
+        bnNew = stdDivide( bnNew, nTargetTimespan );
+
+        if ( compareTo( bnNew, powLimit ) == 1 )
+                bnNew = powLimit;
+
+        return UInt32GetLE(&bnNew);
 }
 
 // frees memory allocated by BRMerkleBlockParse
