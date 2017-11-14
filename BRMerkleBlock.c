@@ -33,7 +33,7 @@
 
 #define MAX_PROOF_OF_WORK 0x1e0ffff0     // highest value for difficulty target (higher values are less difficult)
 #define TARGET_SPACING    (1.5 * 60)     // 1.5 minutes
-#define LYRA 		  450025
+#define LYRA 		  450000
 #define BEGIN(a)          ((char*)&(a))
 
 inline static int _ceil_log2(int x)
@@ -281,7 +281,7 @@ int BRMerkleBlockIsValid(const BRMerkleBlock *block, uint32_t currentTime)
     UInt256 lyraHash = UINT256_ZERO;
 
     // check proof of work
-    if (block->height > 450000) {
+    if (block->height >= LYRA) {
     	    lyra2re2_hash( BEGIN(block->version), BEGIN(lyraHash) );
 	    r = compareTo( lyraHash, target ) == 1 ? 0 : 1;
     }
@@ -327,20 +327,27 @@ int BRMerkleBlockVerifyDifficulty(const BRSet *blockchain, const BRMerkleBlock *
 	    r = 1;
     else if (block->height >= LYRA) {
  	    newTarget = DarkGravityWave( blockchain, previous );
-	    r = block->target != newTarget ? 0 : 1;
+	    if (block->height >= LYRA+25)
+	    	r = block->target != newTarget ? 0 : 1;
+	    else
+		r = block->target > newTarget ? 0 : 1;
     }
     return r;
 }
 
 // current difficulty formula, dash - DarkGravity v3, written by Evan Duffield - evan@dashpay.io
 uint32_t DarkGravityWave(const BRSet *blocks, BRMerkleBlock *previous) {
-        uint32_t result = 0;
+        assert(previous != NULL);
+	assert(blocks != NULL);
+
+	uint32_t result = 0;
         UInt256 powLimit = UINT256_ZERO;
         powLimit = u64_to_u256( MAX_PROOF_OF_WORK );
         uint32_t nPastBlocks = 24;
-        if (!previous || previous->height < nPastBlocks || previous->height < LYRA) {
+        if (!previous || previous->height < nPastBlocks && previous->height < LYRA)
                 return UInt32GetLE(&powLimit);
-        }
+	if (!previous || previous->height < nPastBlocks && (previous->height >= LYRA && previous->height < LYRA+25))
+		return 0x1e0fffff;
 
         BRMerkleBlock *bindex = previous;
         UInt256 pastTargetAvg = UINT256_ZERO;
@@ -357,8 +364,7 @@ uint32_t DarkGravityWave(const BRSet *blocks, BRMerkleBlock *previous) {
                         UInt256 div = stdDivide( add, nCountBlocks + 1 );
                         pastTargetAvg = div;
                 }
-                bindex = BRSetIterate( blocks, &bindex->prevBlock );
-		assert( bindex != NULL );
+                bindex = BRSetIterate( blocks, &bindex->blockHash );
         }
 
         UInt256 bnNew = pastTargetAvg;
