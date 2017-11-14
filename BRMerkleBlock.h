@@ -29,6 +29,7 @@
 #include "BRInt.h"
 #include "BRSet.h"
 #include "PNArith_256.h"
+#include "Lyra2RE/Lyra2RE.h"
 #include <stddef.h>
 #include <inttypes.h>
 
@@ -88,7 +89,7 @@ int BRMerkleBlockContainsTxHash(const BRMerkleBlock *block, UInt256 txHash);
 // verifies the block difficulty target is correct for the block's position in the chain
 // transitionTime is the timestamp of the block at the previous difficulty transition
 // transitionTime may be 0 if block->height is not a multiple of BLOCK_DIFFICULTY_INTERVAL
-int BRMerkleBlockVerifyDifficulty(const BRMerkleBlock *block, const BRMerkleBlock *previous, uint32_t transitionTime);
+int BRMerkleBlockVerifyDifficulty(const BRSet *blockchain, const BRMerkleBlock *block, BRMerkleBlock *previous, uint32_t transitionTime);
 
 // returns the next expected target of the previous block
 uint32_t DarkGravityWave(const BRSet *blocks, BRMerkleBlock *previous);
