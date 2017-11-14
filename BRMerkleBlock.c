@@ -305,12 +305,10 @@ int BRMerkleBlockContainsTxHash(const BRMerkleBlock *block, UInt256 txHash)
 }
 
 // verifies the block difficulty target is correct for the block's position in the chain
-// transitionTime is the timestamp of the block at the previous difficulty transition
-// transitionTime may be 0 if block->height is not a multiple of BLOCK_DIFFICULTY_INTERVAL
 //
 // The difficulty target algorithm is based on Dark Gravity Wave v3, which changes difficulty
 // after every block
-int BRMerkleBlockVerifyDifficulty(const BRSet *blockchain, const BRMerkleBlock *block, BRMerkleBlock *previous, uint32_t transitionTime)
+int BRMerkleBlockVerifyDifficulty(const BRSet *blockchain, const BRMerkleBlock *block, BRMerkleBlock *previous)
 {
     assert(block != NULL);
     assert(previous != NULL);
