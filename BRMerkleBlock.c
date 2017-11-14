@@ -33,6 +33,7 @@
 
 #define MAX_PROOF_OF_WORK 0x1e0ffff0     // highest value for difficulty target (higher values are less difficult)
 #define TARGET_SPACING    (1.5 * 60)     // 1.5 minutes
+#define LYRA 		  450025
 #define BEGIN(a)          ((char*)&(a))
 
 inline static int _ceil_log2(int x)
@@ -322,11 +323,11 @@ int BRMerkleBlockVerifyDifficulty(const BRSet *blockchain, const BRMerkleBlock *
 #endif
 
     uint32_t newTarget = MAX_PROOF_OF_WORK;
-    if (block->height < 450025 && block->target > MAX_PROOF_OF_WORK)
+    if (block->height < LYRA && block->target > MAX_PROOF_OF_WORK)
 	    r = 0;
-    else if (block->height < 450025 && block->target < MAX_PROOF_OF_WORK)
+    else if (block->height < LYRA && block->target < MAX_PROOF_OF_WORK)
 	    r = 1;
-    else if (block->height >= 450025) {
+    else if (block->height >= LYRA) {
  	    newTarget = DarkGravityWave( blockchain, previous );
 	    r = block->target != newTarget ? 0 : 1;
     }
@@ -339,7 +340,7 @@ uint32_t DarkGravityWave(const BRSet *blocks, BRMerkleBlock *previous) {
         UInt256 powLimit = UINT256_ZERO;
         powLimit = u64_to_u256( MAX_PROOF_OF_WORK );
         uint32_t nPastBlocks = 24;
-        if (!previous || previous->height < nPastBlocks || previous->height < 450025) {
+        if (!previous || previous->height < nPastBlocks || previous->height < LYRA) {
                 return UInt32GetLE(&powLimit);
         }
 
