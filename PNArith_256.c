@@ -55,6 +55,34 @@ UInt256 setCompact ( uint32_t blockTarget ) {
         return result;
 }
 
+uint32_t getCompact ( UInt256 lhs ) {
+	uint32_t size = ( bits( lhs ) + 7 ) / 8;
+	uint32_t compact = 0;
+	UInt256 bn = UINT256_ZERO;
+	if (size <= 3)
+		compact = getLow64( lhs ) << 8 * (3 - size);
+	else {
+		bn = rightShift( lhs, (8 * (size - 3)) );
+		compact = getLow64( bn );
+	}
+
+	if (compact & 0x00800000) {
+		compact >>= 8;
+		size++;
+	}
+
+	assert( (compact & ~0x007fffff) == 0);
+	assert(size < 256);
+
+	compact |= size << 24;
+	return compact;
+}
+
+uint64_t getLow64 ( UInt256 lhs ) {
+	assert( WIDTH >= 2 );
+	return lhs.u32[0] | (uint64_t)lhs.u32[1] << 32;
+}
+
 UInt256 leftShift( UInt256 lhs, uint32_t shift ) {
         uint32_t a[WIDTH];
         for ( uint32_t i = 0; i < WIDTH; i++ )

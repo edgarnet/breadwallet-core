@@ -40,6 +40,10 @@ UInt256 u64_to_u256 ( uint64_t num );
 
 UInt256 setCompact ( uint32_t blockTarget );
 
+uint32_t getCompact ( UInt256 lhs );
+
+uint64_t getLow64 ( UInt256 lhs );
+
 UInt256 leftShift( UInt256 lhs, uint32_t shift );
 
 UInt256 rightShift( UInt256 lhs, uint32_t shift );
