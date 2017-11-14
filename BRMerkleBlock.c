@@ -360,7 +360,7 @@ uint32_t DarkGravityWave(const BRSet *blocks, BRMerkleBlock *previous) {
         UInt256 powLimit = UINT256_ZERO;
         powLimit = u256_hex_decode("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         uint32_t nPastBlocks = 24;
-        if (!previous || previous->height < nPastBlocks) {
+        if (!previous || previous->height < nPastBlocks || previous->height < 450025) {
                 return UInt32GetLE(&powLimit);
         }
 

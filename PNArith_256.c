@@ -39,7 +39,7 @@ UInt256 u64_to_u256 ( uint64_t num ) {
 
 UInt256 setCompact ( uint32_t blockTarget ) {
         uint32_t size = blockTarget >> 24;
-        uint32_t target = blockTarget & 0x00ffffff;
+        uint32_t target = blockTarget & 0x007fffff;
 
         UInt256 result = UINT256_ZERO;
 
