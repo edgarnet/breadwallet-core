@@ -262,13 +262,15 @@ int BRMerkleBlockIsValid(const BRMerkleBlock *block, uint32_t currentTime)
     // target is in "compact" format, where the most significant byte is the size of resulting value in bytes, the next
     // bit is the sign, and the remaining 23bits is the value after having been right shifted by (size - 3)*8 bits
     static const uint32_t maxsize = MAX_PROOF_OF_WORK >> 24;
-    const UInt256 maxtarget = u64_to_u256( MAX_PROOF_OF_WORK );
+    const UInt256 maxtarget = setCompact( MAX_PROOF_OF_WORK );
     const uint32_t size = block->target >> 24;
-    const UInt256 target = u64_to_u256( block->target );
+    const UInt256 target = setCompact( block->target );
     size_t hashIdx = 0, flagIdx = 0;
     UInt256 merkleRoot = _BRMerkleBlockRootR(block, &hashIdx, &flagIdx, 0), t = UINT256_ZERO;
     int r = 1;
-    
+
+    const uint32_t nSize = block->target >> 24, pTarget = block->target & 0x00ffffff;
+
     // check if merkle root is correct
     if (block->totalTx > 0 && ! UInt256Eq(merkleRoot, block->merkleRoot)) r = 0;
     
@@ -278,12 +280,22 @@ int BRMerkleBlockIsValid(const BRMerkleBlock *block, uint32_t currentTime)
     // check if proof-of-work target is out of range
     if (size > maxsize || (size == maxsize && compareTo( target, maxtarget ) == 1) ) r = 0;
 
+    UInt256 nVersion = UINT256_ZERO;
     UInt256 lyraHash = UINT256_ZERO;
+    UInt256 nTarget = UINT256_ZERO;
+
+    if (size > 3) UInt32SetLE(&nTarget.u8[size - 3], pTarget);
+    else UInt32SetLE(nTarget.u8, pTarget >> (3 - size)*8);
+
+    UInt32SetLE( nVersion.u8, block->version );
 
     // check proof of work
     if (block->height >= LYRA) {
-    	    lyra2re2_hash( BEGIN(block->version), BEGIN(lyraHash) );
-	    r = compareTo( lyraHash, target ) == 1 ? 0 : 1;
+    	    lyra2re2_hash( nVersion.u8, lyraHash.u8 );
+	    for (int i = sizeof(nTarget) - 1; r && i >= 0; i--) {
+		    if (lyraHash.u8[i] > nTarget.u8[i]) break;
+		    if (lyraHash.u8[i] < nTarget.u8[i]) r = 0;
+	    }
     }
     
     return r;
@@ -342,10 +354,10 @@ uint32_t DarkGravityWave(const BRSet *blocks, BRMerkleBlock *previous) {
 
 	uint32_t result = 0;
         UInt256 powLimit = UINT256_ZERO;
-        powLimit = u64_to_u256( MAX_PROOF_OF_WORK );
+        powLimit = setCompact( MAX_PROOF_OF_WORK );
         uint32_t nPastBlocks = 24;
         if (!previous || previous->height < nPastBlocks && previous->height < LYRA)
-                return UInt32GetLE(&powLimit);
+                return MAX_PROOF_OF_WORK;
 	if (!previous || previous->height < nPastBlocks && (previous->height >= LYRA && previous->height < LYRA+25))
 		return 0x1e0fffff;
 
@@ -382,9 +394,9 @@ uint32_t DarkGravityWave(const BRSet *blocks, BRMerkleBlock *previous) {
         bnNew = stdDivide( bnNew, nTargetTimespan );
 
         if ( compareTo( bnNew, powLimit ) == 1 )
-                bnNew = powLimit;
+                return MAX_PROOF_OF_WORK;
 
-        return UInt32GetLE(&bnNew);
+        return getCompact(bnNew);
 }
 
 // frees memory allocated by BRMerkleBlockParse
