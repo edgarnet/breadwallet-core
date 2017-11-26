@@ -33,7 +33,7 @@
 
 #define MAX_PROOF_OF_WORK 0x1e0ffff0     // highest value for difficulty target (higher values are less difficult)
 #define TARGET_SPACING    (1.5 * 60)     // 1.5 minutes
-#define LYRA 		  450000
+#define LYRA           450000
 #define BEGIN(a)          ((char*)&(a))
 
 inline static int _ceil_log2(int x)
@@ -78,7 +78,7 @@ inline static int _ceil_log2(int x)
 BRMerkleBlock *BRMerkleBlockNew(void)
 {
     BRMerkleBlock *block = calloc(1, sizeof(*block));
-
+    
     assert(block != NULL);
     
     block->height = BLOCK_UNKNOWN_HEIGHT;
@@ -139,7 +139,7 @@ size_t BRMerkleBlockSerialize(const BRMerkleBlock *block, uint8_t *buf, size_t b
     
     if (block->totalTx > 0) {
         len += sizeof(uint32_t) + BRVarIntSize(block->hashesCount) + block->hashesCount*sizeof(UInt256) +
-               BRVarIntSize(block->flagsLen) + block->flagsLen;
+        BRVarIntSize(block->flagsLen) + block->flagsLen;
     }
     
     if (buf && len <= bufLen) {
@@ -155,7 +155,7 @@ size_t BRMerkleBlockSerialize(const BRMerkleBlock *block, uint8_t *buf, size_t b
         off += sizeof(uint32_t);
         UInt32SetLE(&buf[off], block->nonce);
         off += sizeof(uint32_t);
-    
+        
         if (block->totalTx > 0) {
             UInt32SetLE(&buf[off], block->totalTx);
             off += sizeof(uint32_t);
@@ -179,13 +179,13 @@ static size_t _BRMerkleBlockTxHashesR(const BRMerkleBlock *block, UInt256 *txHas
     if (*flagIdx/8 < block->flagsLen && *hashIdx < block->hashesCount) {
         flag = (block->flags[*flagIdx/8] & (1 << (*flagIdx % 8)));
         (*flagIdx)++;
-    
+        
         if (! flag || depth == _ceil_log2(block->totalTx)) {
             if (flag && *idx < hashesCount) {
                 if (txHashes) txHashes[*idx] = block->hashes[*hashIdx]; // leaf
                 (*idx)++;
             }
-        
+            
             (*hashIdx)++;
         }
         else {
@@ -193,7 +193,7 @@ static size_t _BRMerkleBlockTxHashesR(const BRMerkleBlock *block, UInt256 *txHas
             _BRMerkleBlockTxHashesR(block, txHashes, hashesCount, idx, hashIdx, flagIdx, depth + 1); // right branch
         }
     }
-
+    
     return *idx;
 }
 
@@ -202,7 +202,7 @@ static size_t _BRMerkleBlockTxHashesR(const BRMerkleBlock *block, UInt256 *txHas
 size_t BRMerkleBlockTxHashes(const BRMerkleBlock *block, UInt256 *txHashes, size_t hashesCount)
 {
     size_t idx = 0, hashIdx = 0, flagIdx = 0;
-
+    
     assert(block != NULL);
     
     return _BRMerkleBlockTxHashesR(block, txHashes, (txHashes) ? hashesCount : SIZE_MAX, &idx, &hashIdx, &flagIdx, 0);
@@ -231,15 +231,15 @@ static UInt256 _BRMerkleBlockRootR(const BRMerkleBlock *block, size_t *hashIdx, 
 {
     uint8_t flag;
     UInt256 hashes[2], md = UINT256_ZERO;
-
+    
     if (*flagIdx/8 < block->flagsLen && *hashIdx < block->hashesCount) {
         flag = (block->flags[*flagIdx/8] & (1 << (*flagIdx % 8)));
         (*flagIdx)++;
-
+        
         if (flag && depth != _ceil_log2(block->totalTx)) {
             hashes[0] = _BRMerkleBlockRootR(block, hashIdx, flagIdx, depth + 1); // left branch
             hashes[1] = _BRMerkleBlockRootR(block, hashIdx, flagIdx, depth + 1); // right branch
-
+            
             if (! UInt256IsZero(hashes[0]) && ! UInt256Eq(hashes[0], hashes[1])) {
                 if (UInt256IsZero(hashes[1])) hashes[1] = hashes[0]; // if right branch is missing, dup left branch
                 BRSHA256_2(&md, hashes, sizeof(hashes));
@@ -262,15 +262,20 @@ int BRMerkleBlockIsValid(const BRMerkleBlock *block, uint32_t currentTime)
     // target is in "compact" format, where the most significant byte is the size of resulting value in bytes, the next
     // bit is the sign, and the remaining 23bits is the value after having been right shifted by (size - 3)*8 bits
     static const uint32_t maxsize = MAX_PROOF_OF_WORK >> 24;
+    const uint32_t lyrasize = 0x1e0fffff >> 24;
+    
     const UInt256 maxtarget = setCompact( MAX_PROOF_OF_WORK );
+    const UInt256 lyratarget = setCompact( 0x1e0fffff );
+    
     const uint32_t size = block->target >> 24;
     const UInt256 target = setCompact( block->target );
+    
     size_t hashIdx = 0, flagIdx = 0;
     UInt256 merkleRoot = _BRMerkleBlockRootR(block, &hashIdx, &flagIdx, 0), t = UINT256_ZERO;
     int r = 1;
-
+    
     const uint32_t nSize = block->target >> 24, pTarget = block->target & 0x00ffffff;
-
+    
     // check if merkle root is correct
     if (block->totalTx > 0 && ! UInt256Eq(merkleRoot, block->merkleRoot)) r = 0;
     
@@ -278,25 +283,10 @@ int BRMerkleBlockIsValid(const BRMerkleBlock *block, uint32_t currentTime)
     if (block->timestamp > currentTime + BLOCK_MAX_TIME_DRIFT) r = 0;
     
     // check if proof-of-work target is out of range
-    if (size > maxsize || (size == maxsize && compareTo( target, maxtarget ) == 1) ) r = 0;
-
-    UInt256 nVersion = UINT256_ZERO;
-    UInt256 lyraHash = UINT256_ZERO;
-    UInt256 nTarget = UINT256_ZERO;
-
-    if (size > 3) UInt32SetLE(&nTarget.u8[size - 3], pTarget);
-    else UInt32SetLE(nTarget.u8, pTarget >> (3 - size)*8);
-
-    UInt32SetLE( nVersion.u8, block->version );
-
-    // check proof of work
-    if (block->height >= LYRA) {
-    	    lyra2re2_hash( nVersion.u8, lyraHash.u8 );
-	    for (int i = sizeof(nTarget) - 1; r && i >= 0; i--) {
-		    if (lyraHash.u8[i] > nTarget.u8[i]) break;
-		    if (lyraHash.u8[i] < nTarget.u8[i]) r = 0;
-	    }
-    }
+    if (block->height < LYRA)
+        if (size > maxsize || (size == maxsize && compareTo( target, maxtarget ) == 1) ) r = 0;
+    else
+        if (size > maxsize || (size == lyrasize && compareTo( target, lyratarget ) == 1) ) r = 0;
     
     return r;
 }
@@ -326,77 +316,77 @@ int BRMerkleBlockVerifyDifficulty(const BRSet *blockchain, const BRMerkleBlock *
     assert(previous != NULL);
     int r = 1;
     if (! previous || !UInt256Eq(block->prevBlock, previous->blockHash) || block->height != previous->height + 1) r = 0;
-
+    
 #if BITCOIN_TESTNET
     // TODO: implement testnet difficulty rule check
     return 1; // don't worry about difficulty on testnet for now
 #endif
-
+    
     uint32_t newTarget = MAX_PROOF_OF_WORK;
     if (block->height < LYRA && block->target > MAX_PROOF_OF_WORK)
-	    r = 0;
+        r = 0;
     else if (block->height < LYRA && block->target < MAX_PROOF_OF_WORK)
-	    r = 1;
+        r = 1;
     else if (block->height >= LYRA) {
- 	    newTarget = DarkGravityWave( blockchain, previous );
-	    if (block->height >= LYRA+25)
-	    	r = block->target != newTarget ? 0 : 1;
-	    else
-		r = block->target > newTarget ? 0 : 1;
+        newTarget = DarkGravityWave( blockchain, previous );
+        if (block->height >= LYRA+25)
+            r = block->target != newTarget ? 0 : 1;
+        else
+            r = block->target > newTarget ? 0 : 1;
     }
     return r;
 }
 
 // current difficulty formula, dash - DarkGravity v3, written by Evan Duffield - evan@dashpay.io
 uint32_t DarkGravityWave(const BRSet *blocks, BRMerkleBlock *previous) {
-        assert(previous != NULL);
-	assert(blocks != NULL);
-
-	uint32_t result = 0;
-        UInt256 powLimit = UINT256_ZERO;
-        powLimit = setCompact( MAX_PROOF_OF_WORK );
-        uint32_t nPastBlocks = 24;
-        if (!previous || previous->height < nPastBlocks && previous->height < LYRA)
-                return MAX_PROOF_OF_WORK;
-	if (!previous || previous->height < nPastBlocks && (previous->height >= LYRA && previous->height < LYRA+25))
-		return 0x1e0fffff;
-
-        BRMerkleBlock *bindex = previous;
-        UInt256 pastTargetAvg = UINT256_ZERO;
-
-        for (uint32_t nCountBlocks = 1; nCountBlocks <= nPastBlocks; nCountBlocks++) {
-                assert(bindex != NULL);
-		UInt256 bnTarget = setCompact(bindex->target);
-                if (nCountBlocks == 1) {
-                        pastTargetAvg = bnTarget;
-                }
-                else {
-                        UInt256 mult = stdMultiply( pastTargetAvg, nCountBlocks );
-                        UInt256 add = arithAdd( mult, bnTarget );
-                        UInt256 div = stdDivide( add, nCountBlocks + 1 );
-                        pastTargetAvg = div;
-                }
-                bindex = BRSetIterate( blocks, &bindex->blockHash );
+    assert(previous != NULL);
+    assert(blocks != NULL);
+    
+    uint32_t result = 0;
+    UInt256 powLimit = UINT256_ZERO;
+    powLimit = setCompact( MAX_PROOF_OF_WORK );
+    uint32_t nPastBlocks = 24;
+    if (!previous || previous->height < nPastBlocks && previous->height < LYRA)
+        return MAX_PROOF_OF_WORK;
+    if (!previous || previous->height < nPastBlocks && (previous->height >= LYRA && previous->height < LYRA+25))
+        return 0x1e0fffff;
+    
+    BRMerkleBlock *bindex = previous;
+    UInt256 pastTargetAvg = UINT256_ZERO;
+    
+    for (uint32_t nCountBlocks = 1; nCountBlocks <= nPastBlocks; nCountBlocks++) {
+        assert(bindex != NULL);
+        UInt256 bnTarget = setCompact(bindex->target);
+        if (nCountBlocks == 1) {
+            pastTargetAvg = bnTarget;
         }
-
-        UInt256 bnNew = pastTargetAvg;
-
-        uint32_t nActualTimespan = previous->timestamp;
-        uint32_t nTargetTimespan = nPastBlocks * TARGET_SPACING;
-
-        if (nActualTimespan < nTargetTimespan / 3)
-                nActualTimespan = nTargetTimespan / 3;
-        if (nActualTimespan > nTargetTimespan * 3)
-                nActualTimespan = nTargetTimespan * 3;
-
-        // Retarget
-        bnNew = stdMultiply( bnNew, nActualTimespan );
-        bnNew = stdDivide( bnNew, nTargetTimespan );
-
-        if ( compareTo( bnNew, powLimit ) == 1 )
-                return MAX_PROOF_OF_WORK;
-
-        return getCompact(bnNew);
+        else {
+            UInt256 mult = stdMultiply( pastTargetAvg, nCountBlocks );
+            UInt256 add = arithAdd( mult, bnTarget );
+            UInt256 div = stdDivide( add, nCountBlocks + 1 );
+            pastTargetAvg = div;
+        }
+        bindex = BRSetIterate( blocks, &bindex->blockHash );
+    }
+    
+    UInt256 bnNew = pastTargetAvg;
+    
+    uint32_t nActualTimespan = previous->timestamp;
+    uint32_t nTargetTimespan = nPastBlocks * TARGET_SPACING;
+    
+    if (nActualTimespan < nTargetTimespan / 3)
+        nActualTimespan = nTargetTimespan / 3;
+    if (nActualTimespan > nTargetTimespan * 3)
+        nActualTimespan = nTargetTimespan * 3;
+    
+    // Retarget
+    bnNew = stdMultiply( bnNew, nActualTimespan );
+    bnNew = stdDivide( bnNew, nTargetTimespan );
+    
+    if ( compareTo( bnNew, powLimit ) == 1 )
+        return MAX_PROOF_OF_WORK;
+    
+    return getCompact(bnNew);
 }
 
 // frees memory allocated by BRMerkleBlockParse
