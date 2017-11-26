@@ -55,7 +55,7 @@ extern "C" {
 #if BITCOIN_TESTNET
 #define STANDARD_PORT 18333
 #else
-#define STANDARD_PORT 8333
+#define STANDARD_PORT 9401
 #endif
 
 #define SERVICES_NODE_NETWORK 0x01 // services value indicating a node carries full blocks, not just headers
